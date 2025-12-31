@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { streamDefinition, generateAsciiArt, AsciiArtData, generateAppIcon } from './services/geminiService';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { streamDefinition, generateAsciiArt, generateAppIcon } from './services/geminiService';
+import type { AsciiArtData } from './services/geminiService';
 import ContentDisplay from './components/ContentDisplay';
 import SearchBar from './components/SearchBar';
 import LoadingSkeleton from './components/LoadingSkeleton';
@@ -35,17 +36,33 @@ const createFallbackArt = (topic: string): AsciiArtData => {
 };
 
 const App: React.FC = () => {
-  const [currentTopic, setCurrentTopic] = useState<string>('Hypertext');
+  // Read initial topic from URL with safety
+  const initialTopic = useMemo(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('topic') || 'Hypertext';
+    } catch (e) {
+      console.warn('Failed to read URL params:', e);
+      return 'Hypertext';
+    }
+  }, []);
+
+  const [currentTopic, setCurrentTopic] = useState<string>(initialTopic);
   const [content, setContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [asciiArt, setAsciiArt] = useState<AsciiArtData | null>(null);
   const [generationTime, setGenerationTime] = useState<number | null>(null);
+  const [shareFeedback, setShareFeedback] = useState<boolean>(false);
   
   // Bookmark state
   const [bookmarks, setBookmarks] = useState<string[]>(() => {
-    const saved = localStorage.getItem('infinite_wiki_bookmarks');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('infinite_wiki_bookmarks');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
   const [isBookmarksVisible, setIsBookmarksVisible] = useState(false);
 
@@ -65,8 +82,26 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('infinite_wiki_bookmarks', JSON.stringify(bookmarks));
+    try {
+      localStorage.setItem('infinite_wiki_bookmarks', JSON.stringify(bookmarks));
+    } catch (e) {
+      console.warn('Failed to save bookmarks:', e);
+    }
   }, [bookmarks]);
+
+  // Sync current topic to URL with safety check for sandboxed environments
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('topic') !== currentTopic) {
+        url.searchParams.set('topic', currentTopic);
+        window.history.replaceState({ topic: currentTopic }, '', url.toString());
+      }
+    } catch (e) {
+      // Common in sandboxed iFrames where history API is restricted
+      console.debug('URL sync (history API) is restricted in this environment.');
+    }
+  }, [currentTopic]);
 
   useEffect(() => {
     if (!currentTopic) return;
@@ -157,6 +192,37 @@ const App: React.FC = () => {
     });
   }, [currentTopic]);
 
+  const handleShare = useCallback(() => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('topic', currentTopic);
+      const shareUrl = url.toString();
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          setShareFeedback(true);
+          setTimeout(() => setShareFeedback(false), 2000);
+        });
+      } else {
+        // Fallback for non-secure contexts
+        const textarea = document.createElement('textarea');
+        textarea.value = shareUrl;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          setShareFeedback(true);
+          setTimeout(() => setShareFeedback(false), 2000);
+        } catch (err) {
+          console.error('Copy fallback failed', err);
+        }
+        document.body.removeChild(textarea);
+      }
+    } catch (e) {
+      console.error('Share action failed:', e);
+    }
+  }, [currentTopic]);
+
   const isBookmarked = bookmarks.includes(currentTopic);
 
   return (
@@ -191,13 +257,24 @@ const App: React.FC = () => {
             <h2 style={{ textTransform: 'capitalize', margin: 0 }}>
               {currentTopic}
             </h2>
-            <button 
-              onClick={toggleBookmark} 
-              className="bookmark-toggle"
-              aria-label={isBookmarked ? "Remove from bookmarks" : "Add to bookmarks"}
-            >
-              {isBookmarked ? '★' : '☆'}
-            </button>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <button 
+                onClick={handleShare}
+                className="bookmark-toggle"
+                style={{ fontSize: '1.2rem', color: shareFeedback ? '#0000ff' : '#000' }}
+                aria-label="Share topic"
+              >
+                {shareFeedback ? '✓' : '⚯'}
+                {shareFeedback && <span style={{ fontSize: '0.7rem', verticalAlign: 'middle', marginLeft: '4px' }}>Copied!</span>}
+              </button>
+              <button 
+                onClick={toggleBookmark} 
+                className="bookmark-toggle"
+                aria-label={isBookmarked ? "Remove from bookmarks" : "Add to bookmarks"}
+              >
+                {isBookmarked ? '★' : '☆'}
+              </button>
+            </div>
           </div>
 
           {error && (

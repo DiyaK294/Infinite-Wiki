@@ -6,36 +6,32 @@
 
 import {GoogleGenAI} from '@google/genai';
 
-// This check is for development-time feedback.
-if (!process.env.API_KEY) {
+// Safe access to API_KEY to avoid Uncaught ReferenceError: process is not defined
+const getApiKey = (): string => {
+  try {
+    return process.env.API_KEY || '';
+  } catch (e) {
+    console.error('API_KEY not found in process.env');
+    return '';
+  }
+};
+
+const apiKey = getApiKey();
+
+if (!apiKey) {
   console.error(
     'API_KEY environment variable is not set. The application will not be able to connect to the Gemini API.',
   );
 }
 
-// The "!" asserts API_KEY is non-null after the check.
-const ai = new GoogleGenAI({apiKey: process.env.API_KEY!});
+const ai = new GoogleGenAI({apiKey});
 const artModelName = 'gemini-2.5-flash';
 const textModelName = 'gemini-2.5-flash-lite';
 const imageModelName = 'gemini-2.5-flash-image';
 
-/**
- * Art-direction toggle for ASCII art generation.
- * `true`: Slower, higher-quality results (allows the model to "think").
- * `false`: Faster, potentially lower-quality results (skips thinking).
- */
-const ENABLE_THINKING_FOR_ASCII_ART = false;
-
-/**
- * Art-direction toggle for blocky ASCII text generation.
- * `true`: Generates both creative art and blocky text for the topic name.
- * `false`: Generates only the creative ASCII art.
- */
-const ENABLE_ASCII_TEXT_GENERATION = false;
-
 export interface AsciiArtData {
   art: string;
-  text?: string; // Text is now optional
+  text?: string;
 }
 
 /**
@@ -46,7 +42,7 @@ export interface AsciiArtData {
 export async function* streamDefinition(
   topic: string,
 ): AsyncGenerator<string, void, undefined> {
-  if (!process.env.API_KEY) {
+  if (!apiKey) {
     yield 'Error: API_KEY is not configured. Please check your environment variables to continue.';
     return;
   }
@@ -81,7 +77,7 @@ export async function* streamDefinition(
  * @returns A promise that resolves to a base64 image string.
  */
 export async function generateAppIcon(): Promise<string> {
-  if (!process.env.API_KEY) {
+  if (!apiKey) {
     throw new Error('API_KEY is not configured.');
   }
 
@@ -108,7 +104,7 @@ export async function generateAppIcon(): Promise<string> {
     throw new Error('No image data found in response');
   } catch (error) {
     console.error('Error generating app icon:', error);
-    // Return a default minimalist SVG as fallback (a simple node/box icon)
+    // Return a default minimalist SVG as fallback
     return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJMMiA3djEwbDEwIDUgMTAtNVY3TDEyIDJ6bTAgMi44bTcuNSAzLjZMMTIgMTEuMiA0LjUgOC40IDEyIDUuNmwuNSAzLjZ6TTQgOC44djguM2w3IDMuNVYxMi40TDQgOC44em05IDExLjhWMTIuNGw3LTMuNnY4LjNsLTcgMy41eiIvPjwvc3ZnPg==';
   }
 }
@@ -117,7 +113,7 @@ export async function generateAppIcon(): Promise<string> {
  * Generates a single random word or concept using the Gemini API.
  */
 export async function getRandomWord(): Promise<string> {
-  if (!process.env.API_KEY) {
+  if (!apiKey) {
     throw new Error('API_KEY is not configured.');
   }
 
@@ -142,7 +138,7 @@ export async function getRandomWord(): Promise<string> {
  * Generates ASCII art and optionally text for a given topic.
  */
 export async function generateAsciiArt(topic: string): Promise<AsciiArtData> {
-  if (!process.env.API_KEY) {
+  if (!apiKey) {
     throw new Error('API_KEY is not configured.');
   }
   
