@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -18,22 +19,20 @@
         background-color: #ffffff;
         color: #000000;
         font-family: 'Kosugi', sans-serif;
-        font-size: 1.1rem; /* Set base font size for the entire app */
-        line-height: 1.6; /* Set base line height for readability */
+        font-size: 1.1rem;
+        line-height: 1.6;
         margin: 0;
-        padding: 2rem 2rem 5rem 2rem; /* Increased bottom padding for sticky footer */
+        padding: 2rem 2rem 5rem 2rem;
       }
       #root {
-        max-width: 65ch; /* Optimal line length for readability */
+        max-width: 65ch;
         margin: auto;
       }
-      /* Reset headers to have the same font size as the body */
       h1, h2, h3, h4, h5, h6 {
-        font-size: 1em; /* 1em equals the parent font-size, which is 1.1rem from body */
+        font-size: 1em;
         margin: 0;
-        font-weight: normal; /* Ensure no bolding by default */
+        font-weight: normal;
       }
-      /* Reset button for link-like behavior */
       button {
         background: none;
         border: none;
@@ -66,67 +65,124 @@
       }
       .ascii-art {
         font-family: monospace;
-        text-align: left; /* Aligned to the left for better block letter rendering */
+        text-align: left;
         white-space: pre;
         color: #888;
-        margin: 2rem 0; /* Increased margin for more breathing room */
-        line-height: 1.1; /* Tighter line height for better art rendering */
-        font-size: 0.8em; /* Slightly smaller font for more detailed art */
+        margin: 2rem 0;
+        line-height: 1.1;
+        font-size: 0.8em;
       }
       .blinking-cursor {
         animation: blink 1s step-end infinite;
       }
       
-      /* Search Bar Styles */
       .search-container {
         display: flex;
-        align-items: baseline; /* Align to baseline */
-        gap: 1rem;
+        flex-direction: column;
+        gap: 0.5rem;
         margin-bottom: 3rem;
+      }
+      @media (min-width: 600px) {
+        .search-container {
+          flex-direction: row;
+          align-items: baseline;
+          gap: 1rem;
+        }
       }
 
       .search-form {
-        flex-grow: 1; /* Make form take available space */
+        flex-grow: 1;
       }
 
       .search-input {
         width: 100%;
         padding: 0.5rem 0.2rem;
-        font: inherit; /* Inherit font from body */
-        color: inherit; /* Inherit text color */
+        font: inherit;
+        color: inherit;
         border: none;
-        border-bottom: 1px solid transparent; /* No visible line by default */
+        border-bottom: 1px solid #eee;
         background-color: transparent;
-        box-sizing: border-box; /* Include padding in width */
-        outline: none; /* Remove default focus outline */
+        box-sizing: border-box;
+        outline: none;
       }
       
+      .search-input:focus {
+        border-bottom: 1px solid #000;
+      }
+
       .search-input:disabled {
         color: #ccc;
       }
 
       .search-input::placeholder {
-        color: #000000;
-        opacity: 1; /* Override browser default lighter color */
+        color: #888;
       }
       
-      .random-button {
+      .nav-button {
         background: none;
         border: none;
-        padding: 0.5rem 0; /* Align vertically with input */
+        padding: 0.5rem 0;
         font: inherit;
         color: #000000;
         cursor: pointer;
-        white-space: nowrap; /* Prevent "Random" from wrapping */
+        white-space: nowrap;
       }
       
-      .random-button:hover:not(:disabled) {
+      .nav-button:hover:not(:disabled) {
         color: #0000ff;
       }
 
-      .random-button:disabled {
+      .nav-button:disabled {
         color: #ccc;
         cursor: not-allowed;
+      }
+
+      .bookmark-toggle {
+        font-size: 1.5rem;
+        line-height: 1;
+        color: #000;
+        transition: transform 0.1s ease;
+      }
+      .bookmark-toggle:active {
+        transform: scale(1.2);
+      }
+
+      .bookmarks-drawer {
+        border: 1px dashed #ccc;
+        padding: 1rem;
+        margin-bottom: 2rem;
+        background-color: #fafafa;
+      }
+
+      .bookmarks-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem 1.5rem;
+      }
+
+      .bookmark-item {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+
+      .remove-bookmark {
+        color: #ccc;
+        font-size: 1.2rem;
+        line-height: 1;
+      }
+      .remove-bookmark:hover {
+        color: #ff0000;
+      }
+
+      .close-button {
+        font-size: 0.8rem;
+        color: #888;
+        text-transform: uppercase;
+      }
+      .close-button:hover {
+        color: #000;
+        text-decoration: underline;
       }
 
       .sticky-footer {
@@ -138,6 +194,7 @@
         text-align: center;
         padding: 1.5rem 0;
         background-color: #ffffff;
+        border-top: 1px solid #f0f0f0;
       }
     </style>
   <script type="importmap">

@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -16,6 +17,8 @@ if (!process.env.API_KEY) {
 const ai = new GoogleGenAI({apiKey: process.env.API_KEY!});
 const artModelName = 'gemini-2.5-flash';
 const textModelName = 'gemini-2.5-flash-lite';
+const imageModelName = 'gemini-2.5-flash-image';
+
 /**
  * Art-direction toggle for ASCII art generation.
  * `true`: Slower, higher-quality results (allows the model to "think").
@@ -55,7 +58,6 @@ export async function* streamDefinition(
       model: textModelName,
       contents: prompt,
       config: {
-        // Disable thinking for the lowest possible latency, as requested.
         thinkingConfig: { thinkingBudget: 0 },
       },
     });
@@ -70,134 +72,107 @@ export async function* streamDefinition(
     const errorMessage =
       error instanceof Error ? error.message : 'An unknown error occurred.';
     yield `Error: Could not generate content for "${topic}". ${errorMessage}`;
-    // Re-throwing allows the caller to handle the error state definitively.
     throw new Error(errorMessage);
   }
 }
 
 /**
+ * Generates a custom icon for the application favicon.
+ * @returns A promise that resolves to a base64 image string.
+ */
+export async function generateAppIcon(): Promise<string> {
+  if (!process.env.API_KEY) {
+    throw new Error('API_KEY is not configured.');
+  }
+
+  const prompt = "A minimalist, high-contrast, black and white vector icon for a 'Infinite Wiki'. It should represent interconnected nodes, a network of knowledge, and a sense of depth or infinity. Geometric, clean lines, white background with black symbols. High resolution icon style.";
+
+  try {
+    const response = await ai.models.generateContent({
+      model: imageModelName,
+      contents: {
+        parts: [{ text: prompt }]
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1"
+        }
+      }
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    throw new Error('No image data found in response');
+  } catch (error) {
+    console.error('Error generating app icon:', error);
+    // Return a default minimalist SVG as fallback (a simple node/box icon)
+    return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJMMiA3djEwbDEwIDUgMTAtNVY3TDEyIDJ6bTAgMi44bTcuNSAzLjZMMTIgMTEuMiA0LjUgOC40IDEyIDUuNmwuNSAzLjZ6TTQgOC44djguM2w3IDMuNVYxMi40TDQgOC44em05IDExLjhWMTIuNGw3LTMuNnY4LjNsLTcgMy41eiIvPjwvc3ZnPg==';
+  }
+}
+
+/**
  * Generates a single random word or concept using the Gemini API.
- * @returns A promise that resolves to a single random word.
  */
 export async function getRandomWord(): Promise<string> {
   if (!process.env.API_KEY) {
     throw new Error('API_KEY is not configured.');
   }
 
-  const prompt = `Generate a single, random, interesting English word or a two-word concept. It can be a noun, verb, adjective, or a proper noun. Respond with only the word or concept itself, with no extra text, punctuation, or formatting.`;
+  const prompt = `Generate a single, random, interesting English word or a two-word concept. Respond with only the word itself.`;
 
   try {
     const response = await ai.models.generateContent({
       model: textModelName,
       contents: prompt,
       config: {
-        // Disable thinking for low latency.
         thinkingConfig: { thinkingBudget: 0 },
       },
     });
     return response.text.trim();
   } catch (error) {
-    console.error('Error getting random word from Gemini:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'An unknown error occurred.';
-    throw new Error(`Could not get random word: ${errorMessage}`);
+    console.error('Error getting random word:', error);
+    throw error;
   }
 }
 
 /**
  * Generates ASCII art and optionally text for a given topic.
- * @param topic The topic to generate art for.
- * @returns A promise that resolves to an object with art and optional text.
  */
 export async function generateAsciiArt(topic: string): Promise<AsciiArtData> {
   if (!process.env.API_KEY) {
     throw new Error('API_KEY is not configured.');
   }
   
-  const artPromptPart = `1. "art": meta ASCII visualization of the word "${topic}":
-  - Palette: │─┌┐└┘├┤┬┴┼►◄▲▼○●◐◑░▒▓█▀▄■□▪▫★☆♦♠♣♥⟨⟩/\\_|
-  - Shape mirrors concept - make the visual form embody the word's essence
-  - Examples: 
-    * "explosion" → radiating lines from center
-    * "hierarchy" → pyramid structure
-    * "flow" → curved directional lines
-  - Return as single string with \n for line breaks`;
+  const prompt = `For "${topic}", create a JSON object with one key: "art".
+"art": meta ASCII visualization of the word "${topic}":
+- Palette: │─┌┐└┘├┤┬┴┼►◄▲▼○●◐◑░▒▓█▀▄■□▪▫★☆♦♠♣♥⟨⟩/\\_|
+- Minimalist, monochrome.
+Return ONLY raw JSON.`;
 
-
-  const keysDescription = `one key: "art"`;
-  const promptBody = artPromptPart;
-
-  const prompt = `For "${topic}", create a JSON object with ${keysDescription}.
-${promptBody}
-
-Return ONLY the raw JSON object, no additional text. The response must start with "{" and end with "}" and contain only the art property.`;
-
-  const maxRetries = 1;
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      // FIX: Construct config object conditionally to avoid spreading a boolean
-      const config: any = {
+  try {
+    const response = await ai.models.generateContent({
+      model: artModelName,
+      contents: prompt,
+      config: {
         responseMimeType: 'application/json',
-      };
-      if (!ENABLE_THINKING_FOR_ASCII_ART) {
-        config.thinkingConfig = { thinkingBudget: 0 };
-      }
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    });
 
-      const response = await ai.models.generateContent({
-        model: artModelName,
-        contents: prompt,
-        config: config,
-      });
-
-      let jsonStr = response.text.trim();
-      
-      // Debug logging
-      console.log(`Attempt ${attempt}/${maxRetries} - Raw API response:`, jsonStr);
-      
-      // Remove any markdown code fences if present
-      const fenceRegex = /^```(?:json)?\s*\n?(.*?)\n?\s*```$/s;
-      const match = jsonStr.match(fenceRegex);
-      if (match && match[1]) {
-        jsonStr = match[1].trim();
-      }
-
-      // Ensure the string starts with { and ends with }
-      if (!jsonStr.startsWith('{') || !jsonStr.endsWith('}')) {
-        throw new Error('Response is not a valid JSON object');
-      }
-
-      const parsedData = JSON.parse(jsonStr) as AsciiArtData;
-      
-      // Validate the response structure
-      if (typeof parsedData.art !== 'string' || parsedData.art.trim().length === 0) {
-        throw new Error('Invalid or empty ASCII art in response');
-      }
-      
-      // If we get here, the validation passed
-      const result: AsciiArtData = {
-        art: parsedData.art,
-      };
-
-      if (ENABLE_ASCII_TEXT_GENERATION && parsedData.text) {
-        result.text = parsedData.text;
-      }
-      
-      return result;
-
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
-      console.warn(`Attempt ${attempt}/${maxRetries} failed:`, lastError.message);
-      
-      if (attempt === maxRetries) {
-        console.error('All retry attempts failed for ASCII art generation');
-        throw new Error(`Could not generate ASCII art after ${maxRetries} attempts: ${lastError.message}`);
-      }
-      // Continue to next attempt
+    let jsonStr = response.text.trim();
+    const fenceRegex = /^```(?:json)?\s*\n?(.*?)\n?\s*```$/s;
+    const match = jsonStr.match(fenceRegex);
+    if (match && match[1]) {
+      jsonStr = match[1].trim();
     }
-  }
 
-  // This should never be reached, but just in case
-  throw lastError || new Error('All retry attempts failed');
+    const parsedData = JSON.parse(jsonStr) as AsciiArtData;
+    return { art: parsedData.art };
+  } catch (error) {
+    console.error('Error generating ASCII art:', error);
+    throw error;
+  }
 }
